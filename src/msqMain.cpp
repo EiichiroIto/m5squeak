@@ -136,6 +136,7 @@ void ioPutChar(int ch)
 int ioRelinquishProcessorForMicroseconds(int microSeconds)
 {
   /* noop */
+  return microSeconds;
 }
 
 int ioScreenSize(void)
@@ -238,7 +239,8 @@ int map16To16(int c)
 #define BUFF_SIZE 64
 #define SCANLINE_SIZE 2048
 
-static uint16_t scanline[1024];
+static uint16_t scanline[SCANLINE_SIZE];
+static uint8_t dummyline[SCANLINE_SIZE];
 
 void PushScanline(int size)
 {
@@ -254,19 +256,10 @@ void PushScanline(int size)
 	}
 }
 
-static uint8_t dummyline[1024];
-
-static int BitIndex;
-static uint8_t BitMask;
-
-void SetupMask(int pos)
-{
-	BitIndex = pos / 8;
-	BitMask = 0x80 >> (pos % 8);
-}
-
 void ioShowDisplay(int dispBitsIndex, int width, int height, int depth, int affectedL, int affectedR, int affectedT, int affectedB)
 {
+	int line;
+
 	if (affectedR <= affectedL || affectedT >= affectedB) {
 		return;
 	}
@@ -274,11 +267,12 @@ void ioShowDisplay(int dispBitsIndex, int width, int height, int depth, int affe
 	if (depth == 1) {
 		int scanLine1 = ((width + 31) / 32) * 4;
 		int top = scanLine1 * affectedT;
-		int line, i;
 		for (line = affectedT; line < affectedB; line++) {
-			SetupMask(affectedL);
+			register int index = affectedL / 8;
+			register uint8_t mask = 0x80 >> (affectedL % 8);
 			register uint8_t *src = (uint8_t *)(dispBitsIndex+top);
 			register uint8_t *dst = dummyline;
+			int i;
 			for (i = 0; i < scanLine1; i ++) {
 				dst[0] = src[3];
 				dst[1] = src[2];
@@ -287,13 +281,13 @@ void ioShowDisplay(int dispBitsIndex, int width, int height, int depth, int affe
 				src += 4;
 				dst += 4;
 			}
-			dst = &dummyline[BitIndex];
+			dst = &dummyline[index];
 			uint16_t *ptr = scanline;
 			for (i = 0; i < affectedR - affectedL; i ++) {
-				*ptr++ = (*dst & BitMask) ? 0xFFFF : 0;
-				BitMask >>= 1;
-				if (BitMask == 0) {
-					BitMask = 0x80;
+				*ptr++ = (*dst & mask) ? 0xFFFF : 0;
+				mask >>= 1;
+				if (mask == 0) {
+					mask = 0x80;
 					dst ++;
 				}
 			}
@@ -304,7 +298,6 @@ void ioShowDisplay(int dispBitsIndex, int width, int height, int depth, int affe
 		int scanLine8 = bytesPerLine(width, 8);
 		int firstWord8 = scanLine8 * affectedT + bytesPerLineRD(affectedL, 8);
 		int lastWord8 = scanLine8 * affectedT + bytesPerLine(affectedR, 8);
-		int line;
 		for (line = affectedT; line < affectedB; line ++) {
 			register unsigned char *from = (unsigned char *)(dispBitsIndex + firstWord8);
 			register unsigned char *limit = (unsigned char *)(dispBitsIndex + lastWord8);
@@ -324,10 +317,9 @@ void ioShowDisplay(int dispBitsIndex, int width, int height, int depth, int affe
 		int scanLine16 = bytesPerLine(width, 16);
 		int firstWord16 = scanLine16*affectedT + bytesPerLineRD(affectedL, 16);
 		int lastWord16 = scanLine16*affectedT + bytesPerLine(affectedR, 16);
-		int line;
 		for (line = affectedT; line < affectedB; line++) {
-			register unsigned short *from= (unsigned short *)(dispBitsIndex+firstWord16);
-			register unsigned short *limit= (unsigned short *)(dispBitsIndex+lastWord16);
+			register unsigned short *from= (unsigned short *)(dispBitsIndex + firstWord16);
+			register unsigned short *limit= (unsigned short *)(dispBitsIndex + lastWord16);
 			register int count = 0;
 			while (from < limit) {
 				scanline[count++] = map16To16(from[1]);
