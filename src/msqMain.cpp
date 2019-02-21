@@ -66,8 +66,9 @@
 */
 
 #include "M5Stack.h"
-#include <MPU6050_tockn.h>
 #include "msq.h"
+#include "Wire.h"
+#include "config.h"
 
 /*** Variables -- Imported from Virtual Machine ***/
 extern int fullScreenFlag;
@@ -80,9 +81,167 @@ extern int savedWindowSize;   /* set from header when image file is loaded */
 /*** Variables -- image and path names ***/
 char imageName[] = "msqueak.image";
 const char vmPath[] = "m5stackvm";
-MPU6050 mpu6050(Wire);
 int ScreenWidth = 100;
 int ScreenHeight = 100;
+
+/* Mouse Emulation */
+
+#ifdef USE_JOYSTICK_MOUSE
+class JoyMouse {
+	private:
+		int xpos;
+		int ypos;
+		int pushed;
+		int addr;
+		int xcenter;
+		int ycenter;
+		int width;
+		int height;
+
+	public:
+		JoyMouse(int _addr) {
+			addr = _addr;
+		}
+		void setup(int w, int h, int _xc, int _yc) {
+			width = w;
+			height = h;
+			xcenter = _xc;
+			ycenter = _yc;
+			xpos = width / 2;
+			ypos = height / 2;
+			pushed = 0;
+		}
+		void hide() {
+			M5.Lcd.drawPixel(xpos, ypos, 0x0000);
+			M5.Lcd.drawPixel(xpos-1, ypos, 0x0000);
+			M5.Lcd.drawPixel(xpos+1, ypos, 0x0000);
+			M5.Lcd.drawPixel(xpos, ypos-1, 0x0000);
+			M5.Lcd.drawPixel(xpos, ypos+1, 0x0000);
+		}
+		void show() {
+			M5.Lcd.drawPixel(xpos, ypos, 0xFFFF);
+			M5.Lcd.drawPixel(xpos-1, ypos, 0xFFFF);
+			M5.Lcd.drawPixel(xpos+1, ypos, 0xFFFF);
+			M5.Lcd.drawPixel(xpos, ypos-1, 0xFFFF);
+			M5.Lcd.drawPixel(xpos, ypos+1, 0xFFFF);
+		}
+		void poll() {
+			Wire.requestFrom(addr, 3);
+			if (!Wire.available()) {
+				return;
+			}
+			int dx = Wire.read() - xcenter;
+			int dy = Wire.read() - ycenter;
+			pushed = Wire.read();
+			if (abs(dx) > 20) {
+				dx = (dx < 0) ? (dx + 20) / 10 : (dx - 20) / 10;
+			} else {
+				dx = 0;
+			}
+			if (abs(dy) > 20) {
+				dy = (dy < 0) ? (dy + 20) / 10 : (dy - 20) / 10;
+			} else {
+				dy = 0;
+			}
+			if ((xpos + dx < 0) || (xpos + dx > width)) {
+				return;
+			}
+			if ((ypos - dy < 0) || (ypos - dy > height)) {
+				return;
+			}
+			if (dx == 0 && dy == 0) {
+				return;
+			}
+			hide();
+			xpos += dx;
+			ypos -= dy;
+			show();
+		}
+		int x() { return xpos; }
+		int y() { return ypos; }
+		int button() { return pushed; }
+};
+#define JOY_ADDR 0x52
+JoyMouse mouse(JOY_ADDR);
+#endif /* USE_JOYSTICK_MOUSE */
+
+/* Keyboard Emulation */
+
+#ifdef USE_SERIAL_KEYBOARD
+class SerialKeyboard {
+	private:
+		int baud;
+		int ch;
+	public:
+		SerialKeyboard(int _baud) {
+			baud = _baud;
+			ch = -1;
+		}
+		void setup() {
+			Serial.begin(baud);
+		}
+		void poll() {
+		}
+		void _poll() {
+			if (ch != -1) {
+				return;
+			}
+			if (Serial.peek() == -1) {
+				return;
+			}
+			ch = Serial.read();
+		}
+		int peek() {
+			_poll();
+			return ch;
+		}
+		int read() {
+			_poll();
+			int tmp = ch;
+			ch = -1;
+			return tmp;
+		}
+};
+SerialKeyboard keyboard(115200);
+#endif /* USE_SERIAL_KEYBOARD */
+
+#ifdef USE_FACES_KEYBOARD
+class FacesKeyboard {
+	private:
+		int addr;
+		int ch;
+	public:
+		FacesKeyboard(int _addr) {
+			addr = _addr;
+			ch = -1;
+		}
+		void setup() {
+			pinMode(5, INPUT);
+			digitalWrite(5,HIGH);
+		}
+		void poll() {
+			if (ch >= 0) {
+				return;
+			}
+			if (digitalRead(5) == LOW) {
+				Wire.requestFrom(addr, 1);
+				if (Wire.available()) {
+					ch = Wire.read();
+				}
+			}
+		}
+		int peek() {
+			return ch;
+		}
+		int read() {
+			int tmp = ch;
+			ch = -1;
+			return tmp;
+		}
+};
+#define FACES_KEYBOARD_I2C_ADDR 0x08
+FacesKeyboard keyboard(FACES_KEYBOARD_I2C_ADDR);
+#endif /* USE_FACES_KEYBOARD */
 
 /*** Display Primitives ***/
 void ioSetFullScreen(int fullScreen)
@@ -98,6 +257,7 @@ int ioGetButtonState(void)
 	int stButtons = 0;
 	M5.update();
 	stButtons |= (M5.BtnA.wasPressed() ? 0x04 : 0);
+	stButtons |= mouse.button() ? 0x04 : 0;
 	stButtons |= (M5.BtnB.wasPressed() ? 0x02 : 0);
 	stButtons |= (M5.BtnC.wasPressed() ? 0x01 : 0);
 	return stButtons;
@@ -105,27 +265,25 @@ int ioGetButtonState(void)
 
 int ioGetKeystroke(void)
 {
-	return -1;
+	return keyboard.read();
 }
 
 int ioMousePoint(void)
 {
-//	mpu6050.update();
-//	int x = (mpu6050.getAccX() + 1) * ScreenWidth / 2 ;
-//	int y = (mpu6050.getAccY() + 1) * ScreenHeight / 2;
-	int x = 10;
-	int y = 10;
+	int x = mouse.x();
+	int y = mouse.y();
 	return (x << 16) | y;
 }
 
 int ioPeekKeystroke(void)
 {
-	return -1;
+	return keyboard.peek();
 }
 
 void ioProcessEvents(void)
 {
-  /* noop */
+	mouse.poll();
+	keyboard.poll();
 }
 
 void ioPutChar(int ch)
@@ -490,12 +648,11 @@ void InitM5Stack(void)
 	// Initialization
 	SetUpTimers();
 	SetUpPixmap();
-	// Initialize I2C
-	Wire.begin();
-	Wire.setClock(400000UL);
-	// Initialize MPU6050
-	mpu6050.begin();
-	mpu6050.calcGyroOffsets(false);
+	// Initialize Peripherals
+	Wire.begin(21, 22, 400000);
+	mouse.setup(ScreenWidth, ScreenHeight, 125, 116);
+	keyboard.setup();
+	//Serial.begin(115200);
 }
 
 /*** Main ***/
