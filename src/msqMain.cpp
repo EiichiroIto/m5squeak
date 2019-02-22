@@ -130,8 +130,8 @@ class JoyMouse {
 			if (!Wire.available()) {
 				return;
 			}
-			int dx = Wire.read() - xcenter;
-			int dy = Wire.read() - ycenter;
+			int dx = xcenter - Wire.read();
+			int dy = ycenter - Wire.read();
 			pushed = Wire.read();
 			if (abs(dx) > 20) {
 				dx = (dx < 0) ? (dx + 20) / 10 : (dx - 20) / 10;
@@ -255,6 +255,7 @@ class OnScreenKeyboard {
 	public:
 		OnScreenKeyboard() {}
 		void setup() {
+			m5osk.useJoyStick = true;
 			text = String("");
 			pos = 0;
 		}
@@ -357,69 +358,22 @@ void ioSetCursorWithMask(int cursorBitsIndex, int cursorMaskIndex, int offsetX, 
 }
 
 /* displaying */
+#define r8(col) (((col) >> 5) & 0x07)
+#define g8(col) (((col) >> 2)  & 0x07)
+#define b8(col) ((col) & 0x03)
+
 unsigned int	 stColors[256];
-
-void SetColorEntry(int index, int red, int green, int blue)
-{
-  if (index >= 256)
-    return;
-
-  stColors[index] = ((((unsigned int)red  >>(16-3))<<5) |
-		     (((unsigned int)green>>(16-3))<<2) |
-		     ((unsigned int)blue >>(16-2)));
-}
 
 void SetUpPixmap(void)
 {
-  int r, g, b;
+  int i;
 
-  SetColorEntry( 0, 65535, 65535, 65535);	/* white or transparent */
-  SetColorEntry( 1,     0,     0,     0);	/* black */
-  SetColorEntry( 2, 65535, 65535, 65535);	/* opaque white */
-  SetColorEntry( 3, 32768, 32768, 32768);	/* 1/2 gray */
-  SetColorEntry( 4, 65535,     0,     0);	/* red */
-  SetColorEntry( 5,     0, 65535,     0);	/* green */
-  SetColorEntry( 6,     0,     0, 65535);	/* blue */
-  SetColorEntry( 7,     0, 65535, 65535);	/* cyan */
-  SetColorEntry( 8, 65535, 65535,     0);	/* yellow */
-  SetColorEntry( 9, 65535,     0, 65535);	/* magenta */
-  SetColorEntry(10,  8192,  8192,  8192);	/* 1/8 gray */
-  SetColorEntry(11, 16384, 16384, 16384);	/* 2/8 gray */
-  SetColorEntry(12, 24576, 24576, 24576);	/* 3/8 gray */
-  SetColorEntry(13, 40959, 40959, 40959);	/* 5/8 gray */
-  SetColorEntry(14, 49151, 49151, 49151);	/* 6/8 gray */
-  SetColorEntry(15, 57343, 57343, 57343);	/* 7/8 gray */
-  SetColorEntry(16,  2048,  2048,  2048);	/*  1/32 gray */
-  SetColorEntry(17,  4096,  4096,  4096);	/*  2/32 gray */
-  SetColorEntry(18,  6144,  6144,  6144);	/*  3/32 gray */
-  SetColorEntry(19, 10240, 10240, 10240);	/*  5/32 gray */
-  SetColorEntry(20, 12288, 12288, 12288);	/*  6/32 gray */
-  SetColorEntry(21, 14336, 14336, 14336);	/*  7/32 gray */
-  SetColorEntry(22, 18432, 18432, 18432);	/*  9/32 gray */
-  SetColorEntry(23, 20480, 20480, 20480);	/* 10/32 gray */
-  SetColorEntry(24, 22528, 22528, 22528);	/* 11/32 gray */
-  SetColorEntry(25, 26624, 26624, 26624);	/* 13/32 gray */
-  SetColorEntry(26, 28672, 28672, 28672);	/* 14/32 gray */
-  SetColorEntry(27, 30720, 30720, 30720);	/* 15/32 gray */
-  SetColorEntry(28, 34815, 34815, 34815);	/* 17/32 gray */
-  SetColorEntry(29, 36863, 36863, 36863);	/* 18/32 gray */
-  SetColorEntry(30, 38911, 38911, 38911);	/* 19/32 gray */
-  SetColorEntry(31, 43007, 43007, 43007);	/* 21/32 gray */
-  SetColorEntry(32, 45055, 45055, 45055);	/* 22/32 gray */
-  SetColorEntry(33, 47103, 47103, 47103);	/* 23/32 gray */
-  SetColorEntry(34, 51199, 51199, 51199);	/* 25/32 gray */
-  SetColorEntry(35, 53247, 53247, 53247);	/* 26/32 gray */
-  SetColorEntry(36, 55295, 55295, 55295);	/* 27/32 gray */
-  SetColorEntry(37, 59391, 59391, 59391);	/* 29/32 gray */
-  SetColorEntry(38, 61439, 61439, 61439);	/* 30/32 gray */
-  SetColorEntry(39, 63487, 63487, 63487);	/* 31/32 gray */
-  for (r= 0; r < 6; r++) {
-    for (g= 0; g < 6; g++) {
-      for (b= 0; b < 6; b++) {
-	int i= 40 + ((36 * r) + (6 * b) + g);
-	SetColorEntry(i, (r * 65535) / 5, (g * 65535) / 5, (b * 65535) / 5);
-      }
-    }
+  for (i = 0; i < 256; i ++) {
+    int r = r8(i);
+    int g = g8(i);
+    int b = b8(i);
+    uint16_t c = (r << (16-3)) | (g << (11-3)) | (b << (5-2));
+    stColors[i] = c;
   }
 }
 
@@ -444,10 +398,10 @@ int map16To16(int c)
 static uint16_t scanline[SCANLINE_SIZE];
 static uint8_t dummyline[SCANLINE_SIZE];
 
-void PushScanline(int size)
+void PushScanline(int offset, int size)
 {
 	uint16_t nb = size / BUFF_SIZE;
-	uint16_t *ptr = scanline;
+	uint16_t *ptr = &scanline[offset];
 	for (int i = 0; i < nb; i++) {
 		M5.Lcd.pushColors(ptr, BUFF_SIZE);
 		ptr += BUFF_SIZE;
@@ -493,7 +447,7 @@ void ioShowDisplay(int dispBitsIndex, int width, int height, int depth, int affe
 					dst ++;
 				}
 			}
-			PushScanline(affectedR - affectedL);
+			PushScanline(0, affectedR - affectedL);
 			top += scanLine1;
 		}
 	} else if (depth == 8) {
@@ -503,15 +457,15 @@ void ioShowDisplay(int dispBitsIndex, int width, int height, int depth, int affe
 		for (line = affectedT; line < affectedB; line ++) {
 			register unsigned char *from = (unsigned char *)(dispBitsIndex + firstWord8);
 			register unsigned char *limit = (unsigned char *)(dispBitsIndex + lastWord8);
-			register int count = 0;
+			uint16_t *ptr = scanline;
 			while (from < limit) {
-				scanline[count++] = stColors[from[3]];
-				scanline[count++] = stColors[from[2]];
-				scanline[count++] = stColors[from[1]];
-				scanline[count++] = stColors[from[0]];
+				*ptr++ = stColors[from[3]];
+				*ptr++ = stColors[from[2]];
+				*ptr++ = stColors[from[1]];
+				*ptr++ = stColors[from[0]];
 				from += 4;
 			}
-			PushScanline(affectedR - affectedL);
+			PushScanline(affectedL % 4, affectedR - affectedL);
 			firstWord8 += scanLine8;
 			lastWord8 += scanLine8;
 		}
@@ -522,13 +476,13 @@ void ioShowDisplay(int dispBitsIndex, int width, int height, int depth, int affe
 		for (line = affectedT; line < affectedB; line++) {
 			register unsigned short *from= (unsigned short *)(dispBitsIndex + firstWord16);
 			register unsigned short *limit= (unsigned short *)(dispBitsIndex + lastWord16);
-			register int count = 0;
+			uint16_t *ptr = scanline;
 			while (from < limit) {
-				scanline[count++] = map16To16(from[1]);
-				scanline[count++] = map16To16(from[0]);
+				*ptr++ = map16To16(from[1]);
+				*ptr++ = map16To16(from[0]);
 				from += 2;
 			}
-			PushScanline(affectedR - affectedL);
+			PushScanline(0, affectedR - affectedL);
 			firstWord16 += scanLine16;
 			lastWord16 += scanLine16;
 		}
@@ -637,20 +591,6 @@ int getAttributeIntoLength(int id, int byteArrayIndex, int length) {
 	return charsToMove;
 }
 
-/*** Clipboard Support ***/
-
-int clipboardReadIntoAt(int count, int byteArrayIndex, int startIndex) {
-	return 0;
-}
-
-int clipboardSize(void) {
-	return 0;
-}
-
-int clipboardWriteFromAt(int count, int byteArrayIndex, int startIndex) {
-	return 0;
-}
-
 /*** Misc Primitives ***/
 
 void ioBeep(void) {
@@ -693,10 +633,11 @@ void InitM5Stack(void)
 	SetUpTimers();
 	SetUpPixmap();
 	// Initialize Peripherals
+	//M5.Lcd.println("Initializing Peripherals.");
 	Wire.begin(21, 22, 400000);
 	mouse.setup(ScreenWidth, ScreenHeight, 125, 116);
 	keyboard.setup();
-	//Serial.begin(115200);
+	//M5.Lcd.println("Initializing done.");
 }
 
 /*** Main ***/
