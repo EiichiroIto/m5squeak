@@ -6,7 +6,7 @@
 #include "msq.h"
 
 static int sqImageFilePos = 0;
-extern const unsigned char msqueak_image[];
+extern const unsigned char squeak_image[];
 
 void sqImageFileClose(int f) {
   
@@ -23,7 +23,7 @@ int sqImageFilePosition(int f) {
 
 int sqImageFileRead(void *ptr, int elementSize, int count, int f) {
   unsigned char *dst = (unsigned char *) ptr;
-  const unsigned char *src = &msqueak_image[sqImageFilePos] ;
+  const unsigned char *src = &squeak_image[sqImageFilePos] ;
   int size = elementSize * count;
 
   if (size == 0) {
