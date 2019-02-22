@@ -66,8 +66,8 @@
 */
 
 #include "M5Stack.h"
-#include "msq.h"
 #include "Wire.h"
+#include "msq.h"
 #include "config.h"
 
 /*** Variables -- Imported from Virtual Machine ***/
@@ -243,6 +243,48 @@ class FacesKeyboard {
 FacesKeyboard keyboard(FACES_KEYBOARD_I2C_ADDR);
 #endif /* USE_FACES_KEYBOARD */
 
+#ifdef USE_ONSCREEN_KEYBOARD
+#include <M5OnScreenKeyboard.h>
+
+class OnScreenKeyboard {
+	private:
+		String text;
+		int pos;
+		M5OnScreenKeyboard m5osk;
+
+	public:
+		OnScreenKeyboard() {}
+		void setup() {
+			text = String("");
+			pos = 0;
+		}
+		void poll() {
+			if (peek() != -1) {
+				return;
+			}
+			if (M5.BtnC.isPressed()) {
+				start();
+			}
+		}
+		void start() {
+			m5osk.setup();
+			while (m5osk.loop()) {
+				delay(1);
+			}
+			text = m5osk.getString();
+			pos = 0;
+			m5osk.close();
+		}
+		int peek() {
+			return pos >= text.length() ? -1 : text.charAt(pos);
+		}
+		int read() {
+			return pos >= text.length() ? -1 : text.charAt(pos++);
+		}
+};
+OnScreenKeyboard keyboard;
+#endif /* USE_ONSCREEN_KEYBOARD */
+
 /*** Display Primitives ***/
 void ioSetFullScreen(int fullScreen)
 {
@@ -256,10 +298,12 @@ int ioGetButtonState(void)
 	/* right button: 0x01 */
 	int stButtons = 0;
 	M5.update();
-	stButtons |= (M5.BtnA.wasPressed() ? 0x04 : 0);
+	stButtons |= (M5.BtnA.isPressed() ? 0x04 : 0);
 	stButtons |= mouse.button() ? 0x04 : 0;
-	stButtons |= (M5.BtnB.wasPressed() ? 0x02 : 0);
-	stButtons |= (M5.BtnC.wasPressed() ? 0x01 : 0);
+	stButtons |= (M5.BtnB.isPressed() ? 0x02 : 0);
+#ifndef USE_ONSCREEN_KEYBOARD
+	stButtons |= (M5.BtnC.isPressed() ? 0x01 : 0);
+#endif /* USE_ONSCREEN_KEYBOARD */
 	return stButtons;
 }
 

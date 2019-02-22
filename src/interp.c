@@ -17720,8 +17720,7 @@ int readImageFromFileHeapSize(int f, int desiredHeapSize) {
 	if (desiredHeapSize < minimumMemory) {
 		error("Insufficient memory for this image");
 	}
-	//memory = (unsigned char *) sqAllocateMemory(minimumMemory, desiredHeapSize);
-	memory = (unsigned char *) ps_malloc(desiredHeapSize);
+	memory = (unsigned char *) sqAllocateMemory(minimumMemory, desiredHeapSize);
 	if (memory == null) {
 		error("Failed to allocate memory for the heap");
 	}

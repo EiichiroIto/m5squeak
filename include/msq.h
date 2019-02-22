@@ -17,7 +17,7 @@
    can be redefined in sqPlatformSpecific.h if desired. These default
    versions are defined in terms of the ANSI Standard C libraries.
 */
-#define sqAllocateMemory(minHeapSize, desiredHeapSize)   malloc(desiredHeapSize)
+#define sqAllocateMemory(minHeapSize, desiredHeapSize)   ps_malloc(desiredHeapSize)
 
 /* platform-dependent float conversion macros */
 /* Note: Second argument must be a variable name, not an expression! */
