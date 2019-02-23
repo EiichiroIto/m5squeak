@@ -65,12 +65,6 @@ typedef struct {
 	int		lastOp;  /* 0 = uncommitted, 1 = read, 2 = write */
 } SQFile;
 
-/* modifier key */
-#define SHIFTKEY (0x01)
-#define CONTROLKEY (0x02)
-#define ALTKEY (0x04)
-#define COMMANDKEY (0x08)
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -307,7 +301,6 @@ extern int specialObjectsOop;
 extern int lastHash;
 extern int savedWindowSize;
 extern int fullScreenFlag;
-extern int modifierKeyState;
 
 #ifdef __cplusplus
 };
