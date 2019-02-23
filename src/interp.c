@@ -17716,7 +17716,6 @@ int readImageFromFileHeapSize(int f, int desiredHeapSize) {
 		lastHash = 999;
 	}
 	minimumMemory = dataSize + 80000;
-	minimumMemory = desiredHeapSize;
 	if (desiredHeapSize < minimumMemory) {
 		error("Insufficient memory for this image");
 	}

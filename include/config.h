@@ -1,5 +1,5 @@
-#undef USE_SERIAL_KEYBOARD
-#define USE_ONSCREEN_KEYBOARD
+#define USE_SERIAL_KEYBOARD
+#undef USE_ONSCREEN_KEYBOARD
 #undef USE_FACES_KEYBOARD /* currently unavailable */
 
 #define USE_JOYSTICK_MOUSE

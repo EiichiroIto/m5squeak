@@ -83,6 +83,7 @@ char imageName[] = "msqueak.image";
 const char vmPath[] = "m5stackvm";
 int ScreenWidth = 100;
 int ScreenHeight = 100;
+int modifierKeyState = 0;
 
 /* Mouse Emulation */
 
@@ -168,28 +169,167 @@ JoyMouse mouse(JOY_ADDR);
 /* Keyboard Emulation */
 
 #ifdef USE_SERIAL_KEYBOARD
+#define ESC 0x1B
+#define LEFTKEY	(28)
+#define UPKEY (30)
+#define RIGHTKEY (29)
+#define DOWNKEY (31)
+#define INSKEY (5)
+#define DELKEY (5)
+#define PRIORKEY (11)
+#define NEXTKEY (12)
+#define HOMEKEY (1)
+#define ENDKEY (127)
+
 class SerialKeyboard {
 	private:
 		int baud;
 		int ch;
+		enum {
+			SK_NONE = 0,
+			SK_ESC,
+			SK_CSI, /* 1B 5B */
+			SK_CSI1, /* 1B 5B 31 */
+			SK_CSI1a, /* 1B 5B 31 3B */
+			SK_CSI1b, /* 1B 5B 31 3B 32 */
+			SK_CSI2, /* 1B 5B 32 */
+			SK_CSI3, /* 1B 5B 33 */
+			SK_CSI5, /* 1B 5B 35 */
+			SK_CSI6, /* 1B 5B 36 */
+		} state;
 	public:
 		SerialKeyboard(int _baud) {
 			baud = _baud;
 			ch = -1;
+			state = SK_NONE;
 		}
 		void setup() {
 			Serial.begin(baud);
 		}
 		void poll() {
 		}
+		void _setCharWithModkey(int c, int mod) {
+			modifierKeyState = mod;
+			ch = (modifierKeyState << 8) | c;
+		}
+		void _normal(int c) {
+			state = SK_NONE;
+			_setCharWithModkey(c, (c < 0x20) ? CONTROLKEY : 0);
+		}
+		void _shift(int c) {
+			state = SK_NONE;
+			_setCharWithModkey(c, SHIFTKEY);
+		}
+		void _alt(int c) {
+			Serial.print("<ALT-");
+			Serial.print(c);
+			Serial.print(">");
+			state = SK_NONE;
+			_setCharWithModkey(c, COMMANDKEY);
+		}
+		void _transition(int c) {
+			switch (state) {
+			case SK_NONE:
+				if (c == ESC) {
+					state = SK_ESC;
+				} else if (c != 0x0A) {
+					_normal(c);
+				}
+				break;
+			case SK_ESC:
+				if (c == 0x5B) {
+					state = SK_CSI;
+				} else if (c >= 'a' && c <= 'z') {
+					_alt(c);
+				} else {
+					_normal(ESC);
+				}
+				break;
+			case SK_CSI:
+				if (c == 0x31) {
+					state = SK_CSI1;
+				} else if (c == 0x32) {
+					state = SK_CSI2;
+				} else if (c == 0x33) {
+					state = SK_CSI3;
+				} else if (c == 0x35) {
+					state = SK_CSI5;
+				} else if (c == 0x36) {
+					state = SK_CSI6;
+				} else if (c == 0x41) {
+					_normal(UPKEY);
+				} else if (c == 0x42) {
+					_normal(DOWNKEY);
+				} else if (c == 0x43) {
+					_normal(RIGHTKEY);
+				} else if (c == 0x44) {
+					_normal(LEFTKEY);
+				} else if (c == 0x46) {
+					_normal(ENDKEY);
+				} else if (c == 0x48) {
+					_normal(HOMEKEY);
+				} else {
+					state = SK_NONE;
+				}
+				break;
+			case SK_CSI1:
+				if (c == 0x3B) {
+					state = SK_CSI1a;
+				} else {
+					state = SK_NONE;
+				}
+				break;
+			case SK_CSI1a:
+				if (c == 0x32) {
+					state = SK_CSI1b;
+				} else {
+					state = SK_NONE;
+				}
+				break;
+			case SK_CSI1b:
+				if (c == 0x41) {
+					_shift(UPKEY);
+				} else if (c == 0x42) {
+					_shift(DOWNKEY);
+				} else if (c == 0x43) {
+					_shift(RIGHTKEY);
+				} else if (c == 0x44) {
+					_shift(LEFTKEY);
+				} else {
+					state = SK_NONE;
+				}
+				break;
+			case SK_CSI2:
+			case SK_CSI3:
+			case SK_CSI5:
+			case SK_CSI6:
+				state = SK_NONE;
+				if (c == 0x7E) {
+					if (state == SK_CSI2) {
+						_normal(INSKEY);
+					} else if (state == SK_CSI3) {
+						_normal(DELKEY);
+					} else if (state == SK_CSI5) {
+						_normal(PRIORKEY);
+					} else if (state == SK_CSI6) {
+						_normal(NEXTKEY);
+					}
+				}
+				break;
+			}
+
+		}
 		void _poll() {
 			if (ch != -1) {
 				return;
 			}
-			if (Serial.peek() == -1) {
-				return;
+			while (Serial.peek() != -1) {
+				_transition(Serial.read());
+				if (ch != -1) {
+					break;
+				}
+				delay(10);
 			}
-			ch = Serial.read();
 		}
 		int peek() {
 			_poll();
@@ -201,6 +341,34 @@ class SerialKeyboard {
 			ch = -1;
 			return tmp;
 		}
+
+#if 0
+Shift-Up 1b 5b 31 3b 32 41
+Shift-Down 1b 5b 31 3b 32 42
+Shift-Right 1b 5b 31 3b 32 43
+Shift-Left 1b 5b 31 3b 32 44
+
+  
+  Alt+ch -> 1b lower(ch) except Alt+C
+case XK_Left:	return 28; 1b 5b 44
+case XK_Up:		return 30; 1b 5b 41
+case XK_Right:	return 29; 1b 5b 43
+case XK_Down:	return 31; 1b 5b 42
+case XK_Insert:	return  5; 1b 5b 32 7e
+case XK_Prior:	return 11;	/* page up */ 1b 5b 35 7e
+case XK_Next:	return 12;	/* page down */ 1b 5b 36 7e
+case XK_Home:	return  1; 1b 5b 48
+case XK_End:	return  4; 1b 5b 46
+
+case XK_L1:		return ALT+'.';	/* stop */
+case XK_L2:		return ALT+'j';	/* again */
+case XK_L4:		return ALT+'z';	/* undo */
+case XK_L6:		return ALT+'c';	/* copy */
+case XK_L8:		return ALT+'v';	/* paste */
+case XK_L9:		return ALT+'f';	/* find */
+case XK_L10:	return ALT+'x';	/* cut */
+#endif
+
 };
 SerialKeyboard keyboard(115200);
 #endif /* USE_SERIAL_KEYBOARD */
@@ -305,7 +473,7 @@ int ioGetButtonState(void)
 #ifndef USE_ONSCREEN_KEYBOARD
 	stButtons |= (M5.BtnC.isPressed() ? 0x01 : 0);
 #endif /* USE_ONSCREEN_KEYBOARD */
-	return stButtons;
+	return (modifierKeyState << 3) | stButtons;
 }
 
 int ioGetKeystroke(void)
@@ -623,7 +791,7 @@ void InitM5Stack(void)
 {
 	delay(500);
 	// Initialize the M5Stack object
-	M5.begin();
+	M5.begin(true, false, false);
 	// Screen Size
 	ScreenWidth = M5.Lcd.width();
 	ScreenHeight = M5.Lcd.height();
