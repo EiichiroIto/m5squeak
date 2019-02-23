@@ -30,3 +30,10 @@ select a _KEYBOARD.
 select a _MOUSE. (currently have single choice only)
     #define USE_JOYSTICK_MOUSE
 
+# Squeak VM and Images
+## MicroSqueak VM
+m5squeak vm is one from MicroSqueak. (http://web.media.mit.edu/~jmaloney/microsqueak/)
+original license is here. (http://web.media.mit.edu/~jmaloney/microsqueak/license.txt)
+
+## Mini Image
+m5squeak image is one from MiniSqueak2.2. (http://files.squeak.org/SmallSqueaksForPDAs/MiniSqueak2.2/)
