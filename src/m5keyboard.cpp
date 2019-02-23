@@ -46,9 +46,6 @@ void SerialKeyboard::_shift(int c)
 
 void SerialKeyboard::_alt(int c)
 {
-	Serial.print("<ALT-");
-	Serial.print(c);
-	Serial.print(">");
 	state = SK_NONE;
 	_setCharWithModkey(c, COMMANDKEY);
 }

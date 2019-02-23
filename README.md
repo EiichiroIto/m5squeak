@@ -19,3 +19,14 @@ m5squeak is a squeak implementation of m5stack microcontroller.
 ## Run
 * Turn m5stack power on then automatically start.
 * `miniterm.py /dev/ttyUSB0 115200`
+
+## Customize
+modify include/m5config.h.
+
+select a _KEYBOARD.
+    #define USE_SERIAL_KEYBOARD
+    #undef USE_ONSCREEN_KEYBOARD
+
+select a _MOUSE. (currently have single choice only)
+    #define USE_JOYSTICK_MOUSE
+
