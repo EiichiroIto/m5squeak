@@ -3,6 +3,8 @@ m5squeak is a squeak implementation of m5stack microcontroller.
 
 ![Screen](https://raw.githubusercontent.com/EiichiroIto/m5squeak/master/images/m5squeak.jpg)
 
+![Video](https://www.youtube.com/watch?v=xtqu4CF1MqY)
+
 # Prerequisites
 * M5Stack CORE2 (https://shop.m5stack.com/products/m5stack-core2-esp32-iot-development-kit)
 * Micro SD Card (I recommend 16GB card)
@@ -40,3 +42,5 @@ original license is here. (http://web.media.mit.edu/~jmaloney/microsqueak/licens
 
 ## Image
 m5squeak.image is from MiniSqueak2.2. (http://files.squeak.org/SmallSqueaksForPDAs/MiniSqueak2.2/)
+
+
