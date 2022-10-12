@@ -4,7 +4,7 @@
 
 /* squeak keys */
 #define ESC (0x1B)
-#define LEFTKEY	(28)
+#define LEFTKEY (28)
 #define UPKEY (30)
 #define RIGHTKEY (29)
 #define DOWNKEY (31)
@@ -48,8 +48,8 @@ static void _cardkb_poll();
 
 void keyboard_setup()
 {
-	ch = -1;
-	state = SK_NONE;
+  ch = -1;
+  state = SK_NONE;
   modifierKeyState = 0;
   delay(1000);
   Wire.beginTransmission(I2C_CARDKB_ADDR);
@@ -59,13 +59,13 @@ void keyboard_setup()
 
 void keyboard_poll()
 {
-	if (ch != -1) {
-		return;
-	}
+  if (ch != -1) {
+    return;
+  }
   _cardkb_poll();
-	if (ch != -1) {
-		return;
-	}
+  if (ch != -1) {
+    return;
+  }
   _uart_poll();
 }
 
@@ -77,10 +77,10 @@ int keyboard_peek()
 
 int keyboard_read()
 {
-	keyboard_poll();
-	int tmp = ch;
-	ch = -1;
-	return tmp;
+  keyboard_poll();
+  int tmp = ch;
+  ch = -1;
+  return tmp;
 }
 
 int keyboard_modifiers()
@@ -90,132 +90,132 @@ int keyboard_modifiers()
 
 static void _setCharWithModkey(int c, int mod)
 {
-	modifierKeyState = mod;
-	ch = (modifierKeyState << 8) | c;
+  modifierKeyState = mod;
+  ch = (modifierKeyState << 8) | c;
 }
 
 // For serial keyboard
 
 static void _normal(int c)
 {
-	state = SK_NONE;
-	_setCharWithModkey(c, (c < 0x20) ? CONTROLKEY : 0);
+  state = SK_NONE;
+  _setCharWithModkey(c, (c < 0x20) ? CONTROLKEY : 0);
 }
 
 static void _shift(int c)
 {
-	state = SK_NONE;
-	_setCharWithModkey(c, SHIFTKEY);
+  state = SK_NONE;
+  _setCharWithModkey(c, SHIFTKEY);
 }
 
 static void _alt(int c)
 {
-	state = SK_NONE;
-	_setCharWithModkey(c, COMMANDKEY);
+  state = SK_NONE;
+  _setCharWithModkey(c, COMMANDKEY);
 }
 
 static void _transition(int c)
 {
-	switch (state) {
-	case SK_NONE:
-		if (c == ESC) {
-			state = SK_ESC;
-		} else if (c != 0x0A) {
-			_normal(c);
-		}
-		break;
-	case SK_ESC:
-		if (c == 0x5B) {
-			state = SK_CSI;
-		} else if (c >= 'a' && c <= 'z') {
-			_alt(c);
-		} else {
-			_normal(ESC);
-		}
-		break;
-	case SK_CSI:
-		if (c == 0x31) {
-			state = SK_CSI1;
-		} else if (c == 0x32) {
-			state = SK_CSI2;
-		} else if (c == 0x33) {
-			state = SK_CSI3;
-		} else if (c == 0x35) {
-			state = SK_CSI5;
-		} else if (c == 0x36) {
-			state = SK_CSI6;
-		} else if (c == 0x41) {
-			_normal(UPKEY);
-		} else if (c == 0x42) {
-			_normal(DOWNKEY);
-		} else if (c == 0x43) {
-			_normal(RIGHTKEY);
-		} else if (c == 0x44) {
-			_normal(LEFTKEY);
-		} else if (c == 0x46) {
-			_normal(ENDKEY);
-		} else if (c == 0x48) {
-			_normal(HOMEKEY);
-		} else {
-			state = SK_NONE;
-		}
-		break;
-	case SK_CSI1:
-		if (c == 0x3B) {
-			state = SK_CSI1a;
-		} else {
-			state = SK_NONE;
-		}
-		break;
-	case SK_CSI1a:
-		if (c == 0x32) {
-			state = SK_CSI1b;
-		} else {
-			state = SK_NONE;
-		}
-		break;
-	case SK_CSI1b:
-		if (c == 0x41) {
-			_shift(UPKEY);
-		} else if (c == 0x42) {
-			_shift(DOWNKEY);
-		} else if (c == 0x43) {
-			_shift(RIGHTKEY);
-		} else if (c == 0x44) {
-			_shift(LEFTKEY);
-		} else {
-			state = SK_NONE;
-		}
-		break;
-	case SK_CSI2:
-	case SK_CSI3:
-	case SK_CSI5:
-	case SK_CSI6:
-		state = SK_NONE;
-		if (c == 0x7E) {
-			if (state == SK_CSI2) {
-				_normal(INSKEY);
-			} else if (state == SK_CSI3) {
-				_normal(DELKEY);
-			} else if (state == SK_CSI5) {
-				_normal(PRIORKEY);
-			} else if (state == SK_CSI6) {
-				_normal(NEXTKEY);
-			}
-		}
-		break;
-	}
+  switch (state) {
+  case SK_NONE:
+    if (c == ESC) {
+      state = SK_ESC;
+    } else if (c != 0x0A) {
+      _normal(c);
+    }
+    break;
+  case SK_ESC:
+    if (c == 0x5B) {
+      state = SK_CSI;
+    } else if (c >= 'a' && c <= 'z') {
+      _alt(c);
+    } else {
+      _normal(ESC);
+    }
+    break;
+  case SK_CSI:
+    if (c == 0x31) {
+      state = SK_CSI1;
+    } else if (c == 0x32) {
+      state = SK_CSI2;
+    } else if (c == 0x33) {
+      state = SK_CSI3;
+    } else if (c == 0x35) {
+      state = SK_CSI5;
+    } else if (c == 0x36) {
+      state = SK_CSI6;
+    } else if (c == 0x41) {
+      _normal(UPKEY);
+    } else if (c == 0x42) {
+      _normal(DOWNKEY);
+    } else if (c == 0x43) {
+      _normal(RIGHTKEY);
+    } else if (c == 0x44) {
+      _normal(LEFTKEY);
+    } else if (c == 0x46) {
+      _normal(ENDKEY);
+    } else if (c == 0x48) {
+      _normal(HOMEKEY);
+    } else {
+      state = SK_NONE;
+    }
+    break;
+  case SK_CSI1:
+    if (c == 0x3B) {
+      state = SK_CSI1a;
+    } else {
+      state = SK_NONE;
+    }
+    break;
+  case SK_CSI1a:
+    if (c == 0x32) {
+      state = SK_CSI1b;
+    } else {
+      state = SK_NONE;
+    }
+    break;
+  case SK_CSI1b:
+    if (c == 0x41) {
+      _shift(UPKEY);
+    } else if (c == 0x42) {
+      _shift(DOWNKEY);
+    } else if (c == 0x43) {
+      _shift(RIGHTKEY);
+    } else if (c == 0x44) {
+      _shift(LEFTKEY);
+    } else {
+      state = SK_NONE;
+    }
+    break;
+  case SK_CSI2:
+  case SK_CSI3:
+  case SK_CSI5:
+  case SK_CSI6:
+    state = SK_NONE;
+    if (c == 0x7E) {
+      if (state == SK_CSI2) {
+        _normal(INSKEY);
+      } else if (state == SK_CSI3) {
+        _normal(DELKEY);
+      } else if (state == SK_CSI5) {
+        _normal(PRIORKEY);
+      } else if (state == SK_CSI6) {
+        _normal(NEXTKEY);
+      }
+    }
+    break;
+  }
 }
 
 static void _uart_poll()
 {
-	while (Serial.peek() != -1) {
-		_transition(UART.read());
-		if (ch != -1) {
-			break;
-		}
-		delay(10);
-	}
+  while (Serial.peek() != -1) {
+    _transition(UART.read());
+    if (ch != -1) {
+      break;
+    }
+    delay(10);
+  }
 }
 
 // For I2C CardKB keyboard
@@ -287,9 +287,9 @@ static void _cardkb_poll()
   if (!i2cKeyboardAvailable) {
     return;
   }
-	if (ch != -1) {
-		return;
-	}
+  if (ch != -1) {
+    return;
+  }
   Wire.requestFrom(I2C_CARDKB_ADDR, 1);
   if (Wire.available()) {
     ch = Wire.read();
