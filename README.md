@@ -2,38 +2,39 @@
 m5squeak is a squeak implementation of m5stack microcontroller.
 
 # Prerequisites
-* M5Stack FIRE (https://docs.m5stack.com/#/en/core/fire)
-* Visual Studio Code (https://code.visualstudio.com/)
-* Platform IO (vscode extension)
+* M5Stack CORE2 (https://shop.m5stack.com/products/m5stack-core2-esp32-iot-development-kit)
+* Micro SD Card (I recommend 16GB card)
+* Serial Communication Terminal Application to input (I recommend miniterm)
 
 # Options
-* M5Stack_OnScreenKeyboard for Screen Keyboard (https://github.com/lovyan03/M5Stack_OnScreenKeyboard)
-* miniterm.py for Serial Keyboard (pySerial)
-* JoyStick for mouse emulation (https://www.switch-science.com/catalog/4050/)
+* M5Stack Official CardKB Mini Keyboard.
 
-## Build
+# Run
+1. Write m5squeak.image in the images folder to the root of the micro SD card.
+2. Insert the micro SD card into the CORE2.
+3. Write m5squeak.bin in the firmware folder to CORE2.
+4. Restart CORE2.
+
+# Usage
+## Keyboard Input
+* Use Serial Communication Terminal on your PC.
+* Or Use M5Stack Official CardKB Mini Keyboard.
+
+## Mouse Input
+* Touch screen to specify the position.
+* Touch left red circle for red button (primary).
+* Touch center red circle for yellow button (secondary).
+* Touch right red circle for blue button (meta).
+
+# Build
 * `git clone https://github.com/EiichiroIto/m5squeak`
-* Run Visual Studio Code and Open m5stack folder.
+* Run Visual Studio Code and Open m5squeak folder.
 * Build and Upload.
 
-## Run
-* Turn m5stack power on then automatically start.
-* `miniterm.py /dev/ttyUSB0 115200`
-
-## Customize
-modify include/m5config.h.
-
-select a _KEYBOARD.
-    #define USE_SERIAL_KEYBOARD
-    #undef USE_ONSCREEN_KEYBOARD
-
-select a _MOUSE. (currently have single choice only)
-    #define USE_JOYSTICK_MOUSE
-
-# Squeak VM and Images
-## MicroSqueak VM
-m5squeak vm is one from MicroSqueak. (http://web.media.mit.edu/~jmaloney/microsqueak/)
+# Squeak VM and Image
+## VM
+m5squeak vm is from MicroSqueak. (http://web.media.mit.edu/~jmaloney/microsqueak/)
 original license is here. (http://web.media.mit.edu/~jmaloney/microsqueak/license.txt)
 
-## Mini Image
-m5squeak image is one from MiniSqueak2.2. (http://files.squeak.org/SmallSqueaksForPDAs/MiniSqueak2.2/)
+## Image
+m5squeak.image is from MiniSqueak2.2. (http://files.squeak.org/SmallSqueaksForPDAs/MiniSqueak2.2/)

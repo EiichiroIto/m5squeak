@@ -1,56 +1,120 @@
-#include "M5Stack.h"
-#include "Wire.h"
+#include <M5Core2.h>
 #include "msq.h"
-#include "m5config.h"
 #include "m5keyboard.h"
 
-int modifierKeyState = 0;
+/* squeak keys */
+#define ESC (0x1B)
+#define LEFTKEY	(28)
+#define UPKEY (30)
+#define RIGHTKEY (29)
+#define DOWNKEY (31)
+#define INSKEY (5)
+#define DELKEY (5)
+#define PRIORKEY (11)
+#define NEXTKEY (12)
+#define HOMEKEY (1)
+#define ENDKEY (127)
 
-#ifdef USE_SERIAL_KEYBOARD
-#define SERIAL_KEYBOARD_BAUDRATE 115200
-SerialKeyboard keyboard(SERIAL_KEYBOARD_BAUDRATE);
+/* modifier keys */
+#define SHIFTKEY (0x01)
+#define CONTROLKEY (0x02)
+#define ALTKEY (0x04)
+#define COMMANDKEY (0x08)
 
-SerialKeyboard::SerialKeyboard(int _baud)
+static int modifierKeyState = 0;
+static int ch = -1;
+static bool i2cKeyboardAvailable = false;
+
+static enum {
+  SK_NONE = 0,
+  SK_ESC,
+  SK_CSI, /* 1B 5B */
+  SK_CSI1, /* 1B 5B 31 */
+  SK_CSI1a, /* 1B 5B 31 3B */
+  SK_CSI1b, /* 1B 5B 31 3B 32 */
+  SK_CSI2, /* 1B 5B 32 */
+  SK_CSI3, /* 1B 5B 33 */
+  SK_CSI5, /* 1B 5B 35 */
+  SK_CSI6, /* 1B 5B 36 */
+} state;
+
+static void _setCharWithModkey(int c, int mod);
+static void _normal(int c);
+static void _shift(int c);
+static void _alt(int c);
+static void _transition(int c);
+static void _uart_poll();
+static void _cardkb_poll();
+
+void keyboard_setup()
 {
-	baud = _baud;
 	ch = -1;
 	state = SK_NONE;
+  modifierKeyState = 0;
+  delay(1000);
+  Wire.beginTransmission(I2C_CARDKB_ADDR);
+  delay(100);
+  i2cKeyboardAvailable = Wire.endTransmission() == 0;
 }
 
-void SerialKeyboard::setup()
+void keyboard_poll()
 {
-	Serial.begin(baud);
+	if (ch != -1) {
+		return;
+	}
+  _cardkb_poll();
+	if (ch != -1) {
+		return;
+	}
+  _uart_poll();
 }
 
-void SerialKeyboard::poll()
+int keyboard_peek()
 {
+  keyboard_poll();
+  return ch;
 }
 
-void SerialKeyboard::_setCharWithModkey(int c, int mod)
+int keyboard_read()
+{
+	keyboard_poll();
+	int tmp = ch;
+	ch = -1;
+	return tmp;
+}
+
+int keyboard_modifiers()
+{
+  return modifierKeyState;
+}
+
+static void _setCharWithModkey(int c, int mod)
 {
 	modifierKeyState = mod;
 	ch = (modifierKeyState << 8) | c;
 }
 
-void SerialKeyboard::_normal(int c)
+// For serial keyboard
+
+static void _normal(int c)
 {
 	state = SK_NONE;
 	_setCharWithModkey(c, (c < 0x20) ? CONTROLKEY : 0);
 }
 
-void SerialKeyboard::_shift(int c)
+static void _shift(int c)
 {
 	state = SK_NONE;
 	_setCharWithModkey(c, SHIFTKEY);
 }
 
-void SerialKeyboard::_alt(int c)
+static void _alt(int c)
 {
 	state = SK_NONE;
 	_setCharWithModkey(c, COMMANDKEY);
 }
 
-void SerialKeyboard::_transition(int c)
+static void _transition(int c)
 {
 	switch (state) {
 	case SK_NONE:
@@ -143,13 +207,10 @@ void SerialKeyboard::_transition(int c)
 	}
 }
 
-void SerialKeyboard::_poll()
+static void _uart_poll()
 {
-	if (ch != -1) {
-		return;
-	}
 	while (Serial.peek() != -1) {
-		_transition(Serial.read());
+		_transition(UART.read());
 		if (ch != -1) {
 			break;
 		}
@@ -157,110 +218,89 @@ void SerialKeyboard::_poll()
 	}
 }
 
-int SerialKeyboard::peek()
-{
-	_poll();
-	return ch;
-}
+// For I2C CardKB keyboard
 
-int SerialKeyboard::read()
-{
-	_poll();
-	int tmp = ch;
-	ch = -1;
-	return tmp;
-}
-#endif /* USE_SERIAL_KEYBOARD */
+struct {
+  int key;
+  int modifier;
+} cardkb_table[] = {
+  { ESC, 0 },   // 0x80
+  { '1', SHIFTKEY },   // 0x81
+  { '2', SHIFTKEY },   // 0x82
+  { '3', SHIFTKEY },   // 0x83
+  { '4', SHIFTKEY },   // 0x84
+  { '5', SHIFTKEY },   // 0x85
+  { '6', SHIFTKEY },   // 0x86
+  { '7', SHIFTKEY },   // 0x87
+  { '8', SHIFTKEY },   // 0x88
+  { '9', SHIFTKEY },   // 0x89
+  { '0', SHIFTKEY },   // 0x8A
+  { 0x08, 0 },   // 0x8B
+  { 0x09, 0 },   // 0x8C
+  { 'q', COMMANDKEY },   // 0x8D
+  { 'w', COMMANDKEY },   // 0x8E
+  { 'e', COMMANDKEY },   // 0x8F
+  { 'r', COMMANDKEY },   // 0x90
+  { 't', COMMANDKEY },   // 0x91
+  { 'y', COMMANDKEY },   // 0x92
+  { 'u', COMMANDKEY },   // 0x93
+  { 'i', COMMANDKEY },   // 0x94
+  { 'o', COMMANDKEY },   // 0x95
+  { 'p', COMMANDKEY },   // 0x96
+  { 0, 0 },   // 0x97
+  { HOMEKEY, SHIFTKEY },   // 0x98
+  { PRIORKEY, SHIFTKEY },   // 0x99
+  { 'a', COMMANDKEY },   // 0x9A
+  { 's', COMMANDKEY },   // 0x9B
+  { 'd', COMMANDKEY },   // 0x9C
+  { 'f', COMMANDKEY },   // 0x9D
+  { 'g', COMMANDKEY },   // 0x9E
+  { 'h', COMMANDKEY },   // 0x9F
+  { 'j', COMMANDKEY },   // 0xA0
+  { 'k', COMMANDKEY },   // 0xA1
+  { 'l', COMMANDKEY },   // 0xA2
+  { 0x0D, 0 },   // 0xA3
+  { NEXTKEY, SHIFTKEY },   // 0xA4
+  { ENDKEY, SHIFTKEY },   // 0xA5
+  { 'z', COMMANDKEY },   // 0xA6
+  { 'x', COMMANDKEY },   // 0xA7
+  { 'c', COMMANDKEY },   // 0xA8
+  { 'v', COMMANDKEY },   // 0xA9
+  { 'b', COMMANDKEY },   // 0xAA
+  { 'n', COMMANDKEY },   // 0xAB
+  { 'm', COMMANDKEY },   // 0xAC
+  { ',', 0 },   // 0xAD
+  { '.', 0 },   // 0xAE
+  { ' ', 0 },   // 0xAF
+  { 0, 0 },   // 0xB0
+  { 0, 0 },   // 0xB1
+  { 0, 0 },   // 0xB2
+  { 0, 0 },   // 0xB3
+  { LEFTKEY, 0 },   // 0xB4
+  { UPKEY, 0 },   // 0xB5
+  { DOWNKEY, 0 },   // 0xB6
+  { RIGHTKEY, 0 },   // 0xB7
+};
 
-#ifdef USE_FACES_KEYBOARD
-#define FACES_KEYBOARD_I2C_ADDR 0x08
-FacesKeyboard keyboard(FACES_KEYBOARD_I2C_ADDR);
-
-FacesKeyboard::FacesKeyboard(int _addr)
+static void _cardkb_poll()
 {
-	addr = _addr;
-	ch = -1;
-}
-
-void FacesKeyboard::setup()
-{
-	pinMode(5, INPUT);
-	digitalWrite(5,HIGH);
-}
-
-void FacesKeyboard::poll()
-{
-	if (ch >= 0) {
+  if (!i2cKeyboardAvailable) {
+    return;
+  }
+	if (ch != -1) {
 		return;
 	}
-	if (digitalRead(5) == LOW) {
-		Wire.requestFrom(addr, 1);
-		if (Wire.available()) {
-			ch = Wire.read();
-		}
-	}
+  Wire.requestFrom(I2C_CARDKB_ADDR, 1);
+  if (Wire.available()) {
+    ch = Wire.read();
+    if (ch >= 0x80 && ch <= 0xB7) {
+      _setCharWithModkey(cardkb_table[ch - 0x80].key, cardkb_table[ch - 0x80].modifier);
+    } else if (ch >= 'A' && ch <= 'Z') {
+      modifierKeyState = SHIFTKEY;
+    }
+    if (ch == 0) {
+      ch = -1;
+      modifierKeyState = 0;
+    }
+  }
 }
-
-int FacesKeyboard::peek()
-{
-	return ch;
-}
-
-int FacesKeyboard::read()
-{
-	int tmp = ch;
-	ch = -1;
-	return tmp;
-}
-#endif /* USE_FACES_KEYBOARD */
-
-#ifdef USE_ONSCREEN_KEYBOARD
-#include <M5OnScreenKeyboard.h>
-#define USE_ONSCREEN_KEYBOARD_JOYSTICK
-
-OnScreenKeyboard keyboard;
-
-OnScreenKeyboard::OnScreenKeyboard()
-{	
-}
-
-void OnScreenKeyboard::setup()
-{
-#ifdef USE_ONSCREEN_KEYBOARD_JOYSTICK
-	m5osk.useJoyStick = true;
-#endif /* USE_ONSCREEN_KEYBOARD_JOYSTICK */
-	text = String("");
-	pos = 0;
-}
-
-void OnScreenKeyboard::poll()
-{
-	if (peek() != -1) {
-		return;
-	}
-	if (M5.BtnC.isPressed()) {
-		start();
-	}
-}
-
-void OnScreenKeyboard::start()
-{
-	m5osk.setup();
-	while (m5osk.loop()) {
-		delay(1);
-	}
-	text = m5osk.getString();
-	pos = 0;
-	m5osk.close();
-}
-
-int OnScreenKeyboard::peek()
-{
-	return pos >= text.length() ? -1 : text.charAt(pos);
-}
-
-int OnScreenKeyboard::read()
-{
-	return pos >= text.length() ? -1 : text.charAt(pos++);
-}
-#endif /* USE_ONSCREEN_KEYBOARD */

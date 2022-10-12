@@ -1,6 +1,0 @@
-#!/bin/sh
-cp $1 squeak.image
-echo const > squeak.c
-xxd -i squeak.image >> squeak.c
-mv squeak.c ../src/
-rm -f squeak.image

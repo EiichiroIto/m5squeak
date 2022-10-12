@@ -65,12 +65,9 @@
 
 */
 
-#include "M5Stack.h"
-#include "Wire.h"
+#include <M5Core2.h>
 #include "msq.h"
-#include "m5config.h"
 #include "m5keyboard.h"
-#include "m5mouse.h"
 
 /*** Variables -- Imported from Virtual Machine ***/
 extern int fullScreenFlag;
@@ -81,10 +78,16 @@ extern unsigned char *memory;
 extern int savedWindowSize;   /* set from header when image file is loaded */
 
 /*** Variables -- image and path names ***/
-char imageName[] = "msqueak.image";
+char imageName[] = "/m5squeak.image";
 const char vmPath[] = "m5stackvm";
 int ScreenWidth = 100;
 int ScreenHeight = 100;
+
+bool BtnA = false;
+bool BtnB = false;
+bool BtnC = false;
+int MouseX = 0;
+int MouseY = 0;
 
 /*** Display Primitives ***/
 void ioSetFullScreen(int fullScreen)
@@ -98,37 +101,44 @@ int ioGetButtonState(void)
 	/* middle button: 0x02 */
 	/* right button: 0x01 */
 	int stButtons = 0;
-	M5.update();
-	stButtons |= (M5.BtnA.isPressed() ? 0x04 : 0);
-	stButtons |= mouse.button() ? 0x04 : 0;
-	stButtons |= (M5.BtnB.isPressed() ? 0x02 : 0);
-#ifndef USE_ONSCREEN_KEYBOARD
-	stButtons |= (M5.BtnC.isPressed() ? 0x01 : 0);
-#endif /* USE_ONSCREEN_KEYBOARD */
-	return (modifierKeyState << 3) | stButtons;
+	stButtons |= BtnA ? 0x04 : 0;
+	stButtons |= BtnB ? 0x02 : 0;
+	stButtons |= BtnC ? 0x01 : 0;
+	return (keyboard_modifiers() << 3) | stButtons;
 }
 
 int ioGetKeystroke(void)
 {
-	return keyboard.read();
+	return keyboard_read();
 }
 
 int ioMousePoint(void)
 {
-	int x = mouse.x();
-	int y = mouse.y();
-	return (x << 16) | y;
+	return (MouseX << 16) | MouseY;
 }
 
 int ioPeekKeystroke(void)
 {
-	return keyboard.peek();
+	return keyboard_peek();
 }
 
 void ioProcessEvents(void)
 {
-	mouse.poll();
-	keyboard.poll();
+	M5.update();
+  BtnA = M5.BtnA.isPressed();
+	BtnB = M5.BtnB.isPressed();
+	BtnC = M5.BtnC.isPressed();
+  if (M5.Touch.ispressed()) {
+    Point p = M5.Touch.getPressPoint();
+    if (p.y < ScreenHeight) {
+      M5.Lcd.drawLine(MouseX-5, MouseY, MouseX+5, MouseY, ILI9341_WHITE);
+      M5.Lcd.drawLine(MouseX, MouseY-5, MouseX, MouseY+5, ILI9341_WHITE);
+      MouseX = p.x;
+      MouseY = p.y;
+      M5.Lcd.drawLine(MouseX-5, MouseY, MouseX+5, MouseY, ILI9341_BLACK);
+      M5.Lcd.drawLine(MouseX, MouseY-5, MouseX, MouseY+5, ILI9341_BLACK);
+    }
+  }
 }
 
 void ioPutChar(int ch)
@@ -219,7 +229,8 @@ void ioShowDisplay(int dispBitsIndex, int width, int height, int depth, int affe
 	if (affectedR <= affectedL || affectedT >= affectedB) {
 		return;
 	}
-	M5.Lcd.setWindow(affectedL, affectedT, affectedR-1, affectedB-1);
+	//M5.Lcd.setWindow(affectedL, affectedT, affectedR-1, affectedB-1);
+	M5.Lcd.setAddrWindow(affectedL, affectedT, affectedR-affectedL, affectedB-affectedT);
 	if (depth == 1) {
 		int scanLine1 = ((width + 31) / 32) * 4;
 		int top = scanLine1 * affectedT;
@@ -240,7 +251,7 @@ void ioShowDisplay(int dispBitsIndex, int width, int height, int depth, int affe
 			dst = &dummyline[index];
 			uint16_t *ptr = scanline;
 			for (i = 0; i < affectedR - affectedL; i ++) {
-				*ptr++ = (*dst & mask) ? 0xFFFF : 0;
+				*ptr++ = (*dst & mask) ? 0 : 0xFFFF;
 				mask >>= 1;
 				if (mask == 0) {
 					mask = 0x80;
@@ -423,21 +434,21 @@ void InitM5Stack(void)
 {
 	delay(500);
 	// Initialize the M5Stack object
-	M5.begin(true, false, false);
+	M5.begin(true, true, false);
 	// Screen Size
 	ScreenWidth = M5.Lcd.width();
 	ScreenHeight = M5.Lcd.height();
 	// LCD display
-	M5.Lcd.println("Starting MicroSqueak System...");
+	M5.Lcd.println("Starting M5Squeak System...");
 	// Initialization
 	SetUpTimers();
 	SetUpPixmap();
 	// Initialize Peripherals
-	//M5.Lcd.println("Initializing Peripherals.");
-	Wire.begin(21, 22, 400000);
-	mouse.setup(ScreenWidth, ScreenHeight, 125, 116);
-	keyboard.setup();
-	//M5.Lcd.println("Initializing done.");
+	M5.Lcd.println("Initializing Peripherals.");
+	Wire.begin(32, 33, 400000U);
+  Serial.begin(115200);
+	keyboard_setup();
+	M5.Lcd.println("Initializing done.");
 }
 
 /*** Main ***/
@@ -463,6 +474,9 @@ void setup(){
 	M5.Lcd.printf("Available Memory=%d\n", availableMemory);
 	/* read the image file and allocate memory for Squeak heap */
 	f = sqImageFileOpen(imageName, (char*) "rb");
+  if (!f) {
+    ioError("Can't open image file.");
+  }
 	readImageFromFileHeapSize((int)f, availableMemory);
 	sqImageFileClose(f);
 	ioSetFullScreen(fullScreenFlag);
