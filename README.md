@@ -3,7 +3,7 @@ m5squeak is a squeak implementation of m5stack microcontroller.
 
 ![Screen](https://raw.githubusercontent.com/EiichiroIto/m5squeak/master/images/m5squeak.jpg)
 
-![Video](https://www.youtube.com/watch?v=xtqu4CF1MqY)
+[Video](https://www.youtube.com/watch?v=xtqu4CF1MqY)
 
 # Prerequisites
 * M5Stack CORE2 (https://shop.m5stack.com/products/m5stack-core2-esp32-iot-development-kit)
