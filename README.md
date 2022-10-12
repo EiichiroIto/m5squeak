@@ -14,9 +14,9 @@ m5squeak is a squeak implementation of m5stack microcontroller.
 * M5Stack Official CardKB Mini Keyboard.
 
 # Run
-1. Write m5squeak.image in the images folder to the root of the micro SD card.
+1. Copy the image file (images/m5squeak.image) to the root of the micro SD card.
 2. Insert the micro SD card into the CORE2.
-3. Write m5squeak.bin in the firmware folder to CORE2.
+3. Write the firmware (firmware/m5squeak.bin) to CORE2.
 4. Restart CORE2.
 
 # Usage
